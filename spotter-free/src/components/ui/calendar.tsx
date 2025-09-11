@@ -9,10 +9,18 @@ interface CalendarProps {
   selected?: Date
   onSelect?: (date: Date) => void
   className?: string
+  // ISO date strings (YYYY-MM-DD) to mark as completed
+  markedDates?: string[]
+  // Optional counts per date for multiple completions
+  dateCounts?: Record<string, number>
+  // ISO date strings for scheduled (future) workouts
+  scheduledDates?: string[]
+  // Optional counts per scheduled date
+  scheduledCounts?: Record<string, number>
 }
 
 const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
-  ({ className, selected, onSelect }, ref) => {
+  ({ className, selected, onSelect, markedDates = [], dateCounts = {}, scheduledDates = [], scheduledCounts = {} }, ref) => {
     const [currentMonth, setCurrentMonth] = React.useState(new Date())
     
     const today = new Date()
@@ -32,6 +40,9 @@ const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
     
     const days = []
+
+    const markedSet = React.useMemo(() => new Set(markedDates), [markedDates])
+    const scheduledSet = React.useMemo(() => new Set(scheduledDates), [scheduledDates])
     
     // Empty cells for days before the first day of the month
     for (let i = 0; i < firstDayOfWeek; i++) {
@@ -60,6 +71,17 @@ const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
       onSelect?.(selectedDate)
     }
     
+    const toISO = (d: number) => {
+      const mm = String(month + 1).padStart(2, '0')
+      const dd = String(d).padStart(2, '0')
+      return `${year}-${mm}-${dd}`
+    }
+
+    const hasMarker = (day: number) => markedSet.has(toISO(day))
+    const getCount = (day: number) => dateCounts[toISO(day)] || 0
+    const hasScheduled = (day: number) => scheduledSet.has(toISO(day))
+    const getScheduledCount = (day: number) => scheduledCounts[toISO(day)] || 0
+
     const isToday = (day: number) => {
       return today.getDate() === day && 
              today.getMonth() === month && 
@@ -131,7 +153,49 @@ const Calendar = React.forwardRef<HTMLDivElement, CalendarProps>(
                   !isToday(day) && !isSelected(day) && "text-text-primary hover:text-text-primary"
                 )}
               >
-                {day}
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <span>{day}</span>
+                  {(() => {
+                    const c = getCount(day)
+                    const s = getScheduledCount(day)
+                    // Both: show completed badge right, scheduled ring left
+                    if (c > 1 && s > 0) {
+                      return (
+                        <>
+                          <span className="absolute -bottom-1 right-1 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-4 text-center">{c}</span>
+                          <span className="absolute -bottom-1 left-1 h-3 w-3 rounded-full border border-secondary"></span>
+                        </>
+                      )
+                    }
+                    if (c > 1) {
+                      return (
+                        <span className="absolute -bottom-1 right-1 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] leading-4 text-center">{c}</span>
+                      )
+                    }
+                    if (c === 1 || hasMarker(day)) {
+                      if (s > 0) {
+                        // completed dot plus scheduled ring
+                        return (
+                          <>
+                            <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-secondary"></span>
+                            <span className="absolute -bottom-1 left-1 h-3 w-3 rounded-full border border-secondary"></span>
+                          </>
+                        )
+                      }
+                      return <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-secondary"></span>
+                    }
+                    // Scheduled only
+                    if (s > 1) {
+                      return (
+                        <span className="absolute -bottom-1 right-1 min-w-4 h-4 px-1 rounded-full border border-secondary text-text-secondary text-[10px] leading-4 text-center bg-background">{s}</span>
+                      )
+                    }
+                    if (s === 1 || hasScheduled(day)) {
+                      return <span className="absolute bottom-1 h-3 w-3 rounded-full border border-secondary"></span>
+                    }
+                    return null
+                  })()}
+                </div>
               </button>
             )
           })}

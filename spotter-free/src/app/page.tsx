@@ -30,62 +30,61 @@ export default function HomePage() {
   const [recentCompletions, setRecentCompletions] = useState<any[]>([])
 
   useEffect(() => {
-    // Load workout library and completed workouts
-    const savedWorkouts = JSON.parse(localStorage.getItem('workouts') || '[]')
-    const completedWorkouts = JSON.parse(localStorage.getItem('completedWorkouts') || '[]')
-    
-    // Calculate stats
-    const now = new Date()
-    const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay()))
-    startOfWeek.setHours(0, 0, 0, 0)
-    
-    const thisWeekCompletions = completedWorkouts.filter((completion: any) => {
-      const completionDate = new Date(completion.completedDate)
-      return completionDate >= startOfWeek
-    })
+    const recompute = () => {
+      const savedWorkouts = JSON.parse(localStorage.getItem('workouts') || '[]')
+      const completedWorkouts = JSON.parse(localStorage.getItem('completedWorkouts') || '[]')
 
-    // Calculate streak (consecutive days with workouts)
-    const sortedDates = [...new Set(completedWorkouts.map((c: any) => c.completedDate))]
-      .sort((a, b) => new Date(b as string).getTime() - new Date(a as string).getTime())
-    
-    let streak = 0
-    const today = new Date().toISOString().split('T')[0]
-    let checkDate = today
-    
-    for (const date of sortedDates) {
-      if (date === checkDate) {
-        streak++
-        const prevDate = new Date(checkDate)
-        prevDate.setDate(prevDate.getDate() - 1)
-        checkDate = prevDate.toISOString().split('T')[0]
-      } else {
-        break
+      // Stats
+      const now = new Date()
+      const sow = new Date(now)
+      sow.setDate(now.getDate() - now.getDay())
+      sow.setHours(0, 0, 0, 0)
+
+      const thisWeekCompletions = completedWorkouts.filter((c: any) => new Date(c.completedDate) >= sow)
+
+      // Streak
+      const sortedDates = [...new Set(completedWorkouts.map((c: any) => c.completedDate))]
+        .sort((a, b) => new Date(b as string).getTime() - new Date(a as string).getTime())
+      let streak = 0
+      const today = new Date().toISOString().split('T')[0]
+      let checkDate = today
+      for (const date of sortedDates) {
+        if (date === checkDate) {
+          streak++
+          const prevDate = new Date(checkDate)
+          prevDate.setDate(prevDate.getDate() - 1)
+          checkDate = prevDate.toISOString().split('T')[0]
+        } else {
+          break
+        }
       }
+
+      const hoursTrained = Math.round((completedWorkouts.length * 0.75) * 10) / 10
+      setWorkoutStats({
+        thisWeek: thisWeekCompletions.length,
+        total: completedWorkouts.length,
+        hoursTrained,
+        streak,
+      })
+
+      const recentWithNames = completedWorkouts
+        .sort((a: any, b: any) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+        .slice(0, 5)
+        .map((completion: any) => {
+          const workout = savedWorkouts.find((w: any) => w.id === completion.workoutId)
+          return { ...completion, workoutName: workout?.title || 'Unknown Workout' }
+        })
+      setRecentCompletions(recentWithNames)
     }
 
-    // Estimate hours (assume 45 mins per workout average)
-    const hoursTrained = Math.round((completedWorkouts.length * 0.75) * 10) / 10
-
-    setWorkoutStats({
-      thisWeek: thisWeekCompletions.length,
-      total: completedWorkouts.length,
-      hoursTrained,
-      streak
-    })
-
-    // Get recent completions with workout names
-    const recentWithNames = completedWorkouts
-      .sort((a: any, b: any) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-      .slice(0, 5)
-      .map((completion: any) => {
-        const workout = savedWorkouts.find((w: any) => w.id === completion.workoutId)
-        return {
-          ...completion,
-          workoutName: workout?.title || 'Unknown Workout'
-        }
-      })
-    
-    setRecentCompletions(recentWithNames)
+    recompute()
+    const handle = () => recompute()
+    window.addEventListener('storage', handle)
+    window.addEventListener('completedWorkoutsUpdated', handle as any)
+    return () => {
+      window.removeEventListener('storage', handle)
+      window.removeEventListener('completedWorkoutsUpdated', handle as any)
+    }
   }, [])
 
   if (!isAuthenticated) {

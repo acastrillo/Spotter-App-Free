@@ -9,6 +9,7 @@ import { MobileNav } from "@/components/layout/mobile-nav"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import StreakPopup from "@/components/ui/streak-popup"
 // import { extractWorkoutFromImage, ParsedWorkout } from "@/lib/extractWorkoutFromImage" // Temporarily disabled
 import { 
   Plus, 
@@ -35,6 +36,9 @@ export default function LibraryPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [isProcessingImage, setIsProcessingImage] = useState(false)
   const [showOCRResult, setShowOCRResult] = useState<any | null>(null)
+  const [showStreakPopup, setShowStreakPopup] = useState(false)
+  const [streakCount, setStreakCount] = useState(0)
+  const [popupDateLabel, setPopupDateLabel] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     // Load workouts from localStorage
@@ -42,25 +46,76 @@ export default function LibraryPage() {
     setWorkouts(savedWorkouts)
   }, [])
 
+  const computeStreak = (allDates: string[], anchorIso: string) => {
+    const unique = Array.from(new Set(allDates)).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+    let streak = 0
+    let cursor = anchorIso
+    for (const ds of unique) {
+      if (ds === cursor) {
+        streak++
+        const prev = new Date(cursor)
+        prev.setDate(prev.getDate() - 1)
+        cursor = prev.toISOString().split('T')[0]
+      } else if (new Date(ds) < new Date(cursor)) {
+        break
+      }
+    }
+    return streak
+  }
+
   const handleMarkCompleted = (workoutId: string) => {
-    const completionDate = new Date(selectedDate).toISOString()
-    
-    // Get existing completions
+    const todayIso = new Date().toISOString().split('T')[0]
+    const selected = selectedDate
+
+    // Future date -> schedule
+    if (selected > todayIso) {
+      const existing = JSON.parse(localStorage.getItem('scheduledWorkouts') || '[]')
+      const newItem = {
+        id: Date.now().toString(),
+        workoutId,
+        scheduledDate: selected,
+        createdAt: new Date().toISOString(),
+      }
+      const updated = [...existing, newItem]
+      localStorage.setItem('scheduledWorkouts', JSON.stringify(updated))
+      window.dispatchEvent(new Event('scheduledWorkoutsUpdated'))
+      setShowDatePicker(null)
+      alert(`Workout scheduled for ${selected}`)
+      return
+    }
+
+    // Today or past -> complete
+    const completionDate = new Date(selected).toISOString()
     const existingCompletions = JSON.parse(localStorage.getItem('completedWorkouts') || '[]')
-    
-    // Add new completion
     const newCompletion = {
       id: Date.now().toString(),
       workoutId,
       completedAt: completionDate,
-      completedDate: selectedDate
+      completedDate: selected,
     }
-    
-    existingCompletions.push(newCompletion)
-    localStorage.setItem('completedWorkouts', JSON.stringify(existingCompletions))
-    
+    const updatedCompletions = [...existingCompletions, newCompletion]
+    localStorage.setItem('completedWorkouts', JSON.stringify(updatedCompletions))
+
+    // If there was a scheduled item for this workout/date, remove it
+    const existingScheduled = JSON.parse(localStorage.getItem('scheduledWorkouts') || '[]')
+    const filteredScheduled = existingScheduled.filter((s: any) => !(s.workoutId === workoutId && s.scheduledDate === selected))
+    if (filteredScheduled.length !== existingScheduled.length) {
+      localStorage.setItem('scheduledWorkouts', JSON.stringify(filteredScheduled))
+      window.dispatchEvent(new Event('scheduledWorkoutsUpdated'))
+    }
+
+    // Notify other pages (home, calendar)
+    window.dispatchEvent(new Event('completedWorkoutsUpdated'))
+
+    // Compute streak relative to selected date (or today if same)
+    const anchor = selected
+    const allDates = updatedCompletions.map((c: any) => c.completedDate)
+    const streak = computeStreak(allDates, anchor)
+    setStreakCount(streak)
+    setPopupDateLabel(new Date(anchor).toLocaleDateString())
+    setShowStreakPopup(true)
+
     setShowDatePicker(null)
-    alert(`Workout marked as completed on ${selectedDate}!`)
   }
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -168,6 +223,12 @@ export default function LibraryPage() {
       <Header />
       <main className="min-h-screen pb-20 md:pb-8 flex justify-center">
         <div className="w-full max-w-6xl mx-auto px-4 py-8">
+          <StreakPopup 
+            show={showStreakPopup} 
+            onClose={() => setShowStreakPopup(false)}
+            streak={streakCount}
+            dateLabel={popupDateLabel}
+          />
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>

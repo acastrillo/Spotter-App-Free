@@ -1,18 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAuthStore } from "@/store"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Dumbbell } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
 
 export function Login() {
-  const [email, setEmail] = useState("demo@spotter.com")
-  const [password, setPassword] = useState("password")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const { login } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -23,6 +26,11 @@ export function Login() {
       const success = await login(email, password)
       if (!success) {
         setError("Invalid credentials")
+        return
+      }
+      // If we're on the dedicated auth page, send to home on success
+      if (pathname?.startsWith("/auth/login")) {
+        router.push("/")
       }
     } catch (error) {
       setError("Something went wrong")
@@ -80,7 +88,7 @@ export function Login() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
             <div className="text-center text-sm text-text-secondary">
-              Use any email and password to sign in (demo mode)
+              Enter your email and password to sign in.
             </div>
           </form>
         </CardContent>

@@ -1,44 +1,46 @@
-import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+"use client"
+
+import { useSession, signIn as nextAuthSignIn, signOut as nextAuthSignOut } from 'next-auth/react'
 
 interface User {
   id: string
   email: string
-  firstName?: string
-  lastName?: string
+  firstName?: string | null
+  lastName?: string | null
 }
 
 interface AuthState {
   isAuthenticated: boolean
   user: User | null
   login: (email: string, password: string) => Promise<boolean>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      isAuthenticated: false,
-      user: null,
-      login: async (email: string, password: string) => {
-        // Simple mock authentication - any email/password works
-        if (email && password) {
-          const user: User = {
-            id: '1',
-            email,
-            firstName: email.split('@')[0] || 'User',
-            lastName: 'Demo',
-          }
-          
-          set({ isAuthenticated: true, user })
-          return true
-        }
-        return false
-      },
-      logout: () => set({ isAuthenticated: false, user: null }),
-    }),
-    {
-      name: 'spotter-auth',
-    }
-  )
-)
+export const useAuthStore = (): AuthState => {
+  const { data: session, status } = useSession()
+
+  const user: User | null = session?.user?.email
+    ? {
+        id: (session.user as any).id || '',
+        email: session.user.email as string,
+        firstName: (session.user as any).firstName ?? null,
+        lastName: (session.user as any).lastName ?? null,
+      }
+    : null
+
+  return {
+    isAuthenticated: status === 'authenticated',
+    user,
+    login: async (email: string, password: string) => {
+      const res = await nextAuthSignIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+      return !res?.error
+    },
+    logout: async () => {
+      await nextAuthSignOut({ redirect: false })
+    },
+  }
+}

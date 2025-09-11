@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import StreakPopup from "@/components/ui/streak-popup"
 import {
   ArrowLeft,
   Clock,
@@ -51,6 +52,9 @@ export default function WorkoutViewPage() {
   const params = useParams()
   const [workout, setWorkout] = useState<Workout | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showStreakPopup, setShowStreakPopup] = useState(false)
+  const [streakCount, setStreakCount] = useState(0)
+  const [popupDateLabel, setPopupDateLabel] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     const workoutId = params?.id as string
@@ -117,11 +121,55 @@ export default function WorkoutViewPage() {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
   }
 
+  const computeStreak = (allDates: string[], anchorIso: string) => {
+    const unique = Array.from(new Set(allDates)).sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+    let streak = 0
+    let cursor = anchorIso
+    for (const ds of unique) {
+      if (ds === cursor) {
+        streak++
+        const prev = new Date(cursor)
+        prev.setDate(prev.getDate() - 1)
+        cursor = prev.toISOString().split('T')[0]
+      } else if (new Date(ds) < new Date(cursor)) {
+        break
+      }
+    }
+    return streak
+  }
+
+  const markCompletedToday = () => {
+    if (!workout) return
+    const todayIso = new Date().toISOString().split('T')[0]
+    const completedAt = new Date().toISOString()
+    const existing = JSON.parse(localStorage.getItem('completedWorkouts') || '[]')
+    const newEntry = {
+      id: Date.now().toString(),
+      workoutId: workout.id,
+      completedAt,
+      completedDate: todayIso,
+    }
+    const updated = [...existing, newEntry]
+    localStorage.setItem('completedWorkouts', JSON.stringify(updated))
+    window.dispatchEvent(new Event('completedWorkoutsUpdated'))
+
+    const streak = computeStreak(updated.map((c: any) => c.completedDate), todayIso)
+    setStreakCount(streak)
+    setPopupDateLabel(new Date(todayIso).toLocaleDateString())
+    setShowStreakPopup(true)
+  }
+
   return (
     <>
       <Header />
       <main className="min-h-screen pb-20 md:pb-8">
         <div className="max-w-4xl mx-auto px-4 py-8">
+          <StreakPopup 
+            show={showStreakPopup} 
+            onClose={() => setShowStreakPopup(false)}
+            streak={streakCount}
+            dateLabel={popupDateLabel}
+          />
           {/* Header */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -174,6 +222,14 @@ export default function WorkoutViewPage() {
                 </div>
               )}
               
+            </div>
+
+            {/* Quick actions */}
+            <div className="flex gap-2 justify-end mt-2">
+              <Button onClick={markCompletedToday} className="flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                Mark Completed Today
+              </Button>
             </div>
 
           </div>
