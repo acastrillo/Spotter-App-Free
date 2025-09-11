@@ -16,11 +16,9 @@ import {
   FileText, 
   Upload, 
   CheckCircle,
-  Brain,
   Sparkles
 } from "lucide-react"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
-import { LLMProcessing } from "@/components/ui/llm-processing"
 
 export default function ImportWorkoutPage() {
   const { isAuthenticated } = useAuthStore()
@@ -30,7 +28,6 @@ export default function ImportWorkoutPage() {
   const [workoutTitle, setWorkoutTitle] = useState("")
   const [workoutContent, setWorkoutContent] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [isProcessingLLM, setIsProcessingLLM] = useState(false)
   const [fetchedData, setFetchedData] = useState<any>(null)
   const [workoutData, setWorkoutData] = useState<any>(null)
 
@@ -42,7 +39,6 @@ export default function ImportWorkoutPage() {
     if (!url.trim()) return
 
     setIsLoading(true)
-    setIsProcessingLLM(false)
     
     try {
       // Step 1: Fetch from Instagram
@@ -63,12 +59,9 @@ export default function ImportWorkoutPage() {
       const fetchData = await fetchResponse.json()
       setFetchedData(fetchData)
       setWorkoutContent(fetchData.content)
-      setIsLoading(false)
       
-      // Step 2: Process with LLM
-      setIsProcessingLLM(true)
-      
-      const llmResponse = await fetch('/api/ingest', {
+      // Step 2: Process caption into simple rows
+      const processResponse = await fetch('/api/ingest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -79,28 +72,27 @@ export default function ImportWorkoutPage() {
         }),
       })
 
-      if (!llmResponse.ok) {
-        let errorMessage = `Failed to process workout with AI (${llmResponse.status})`
+      if (!processResponse.ok) {
+        let errorMessage = `Failed to process workout (${processResponse.status})`
         try {
-          const error = await llmResponse.json()
+          const error = await processResponse.json()
           errorMessage = error.error || errorMessage
         } catch {
-          errorMessage = `HTTP ${llmResponse.status}: ${llmResponse.statusText}`
+          errorMessage = `HTTP ${processResponse.status}: ${processResponse.statusText}`
         }
-        console.error('LLM API Error:', errorMessage)
+        console.error('Processing API Error:', errorMessage)
         throw new Error(errorMessage)
       }
 
-      const workoutResult = await llmResponse.json()
+      const workoutResult = await processResponse.json()
       setWorkoutData(workoutResult)
-      setWorkoutTitle(workoutResult.workoutV1?.name || fetchData.title || 'Imported Workout')
+      setWorkoutTitle(fetchData.title || 'Imported Workout')
       
     } catch (error) {
       console.error('Process error:', error)
       alert(error instanceof Error ? error.message : 'Failed to process workout')
     } finally {
       setIsLoading(false)
-      setIsProcessingLLM(false)
     }
   }
 
@@ -110,11 +102,9 @@ export default function ImportWorkoutPage() {
     try {
       let workoutToEdit = workoutData
 
-      // If we don't have LLM processed data, process it now
+      // If we don't have processed data, process it now
       if (!workoutData && workoutContent) {
-        setIsProcessingLLM(true)
-        
-        const llmResponse = await fetch('/api/ingest', {
+        const processResponse = await fetch('/api/ingest', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -125,12 +115,10 @@ export default function ImportWorkoutPage() {
           }),
         })
 
-        if (llmResponse.ok) {
-          workoutToEdit = await llmResponse.json()
+        if (processResponse.ok) {
+          workoutToEdit = await processResponse.json()
           setWorkoutData(workoutToEdit)
         }
-        
-        setIsProcessingLLM(false)
       }
 
       // Store workout data in sessionStorage for the edit page
@@ -153,14 +141,12 @@ export default function ImportWorkoutPage() {
     } catch (error) {
       console.error('Processing error:', error)
       alert('Failed to process workout')
-      setIsProcessingLLM(false)
     }
   }
 
   return (
     <>
       <Header />
-      <LLMProcessing isVisible={isProcessingLLM} />
       <main className="min-h-screen pb-20 md:pb-8 flex justify-center">
         <div className="w-full max-w-4xl mx-auto px-4 py-8">
           {/* Header */}
@@ -212,13 +198,11 @@ export default function ImportWorkoutPage() {
                         />
                         <Button 
                           onClick={handleFetch}
-                          disabled={isLoading || isProcessingLLM || !url.trim()}
+                          disabled={isLoading || !url.trim()}
                           className="min-w-[80px]"
                         >
                           {isLoading ? (
-                            <LoadingSpinner size="sm" text="Fetching" />
-                          ) : isProcessingLLM ? (
-                            <LoadingSpinner size="sm" text="AI Processing" />
+                            <LoadingSpinner size="sm" text="Processing" />
                           ) : (
                             "Fetch"
                           )}
@@ -241,12 +225,9 @@ export default function ImportWorkoutPage() {
                           {workoutData && (
                             <div className="mb-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                               <div className="flex items-center space-x-2 mb-2">
-                                <Brain className="h-4 w-4 text-green-500" />
+                                <CheckCircle className="h-4 w-4 text-green-500" />
                                 <span className="text-sm text-green-500 font-medium">
-                                  AI Processing Complete
-                                  {workoutData.usedLLM && (
-                                    <span className="text-xs ml-1">({workoutData.usedLLM})</span>
-                                  )}
+                                  Caption processed successfully
                                 </span>
                               </div>
                               
@@ -350,19 +331,17 @@ export default function ImportWorkoutPage() {
                   size="lg" 
                   className="px-8"
                   onClick={handleParseWorkout}
-                  disabled={!workoutTitle || !workoutContent || isProcessingLLM}
+                  disabled={!workoutTitle || !workoutContent}
                 >
-                  {isProcessingLLM ? (
-                    <LoadingSpinner size="sm" text="Processing" />
-                  ) : workoutData ? (
+                  {workoutData ? (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Save Workout
+                      Edit Workout
                     </>
                   ) : (
                     <>
                       <Upload className="h-4 w-4 mr-2" />
-                      Parse Workout
+                      Create Workout
                     </>
                   )}
                 </Button>
@@ -370,43 +349,43 @@ export default function ImportWorkoutPage() {
             </CardContent>
           </Card>
 
-          {/* What We Can Parse Section */}
+          {/* How It Works Section */}
           <Card>
             <CardHeader className="pb-4">
               <div className="flex items-center space-x-2 text-primary">
                 <CheckCircle className="h-5 w-5" />
-                <CardTitle className="text-lg">What We Can Parse</CardTitle>
+                <CardTitle className="text-lg">How It Works</CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-3 gap-6">
                 <div>
-                  <h4 className="font-semibold text-text-primary mb-3">Exercise Formats</h4>
+                  <h4 className="font-semibold text-text-primary mb-3">1. Import Content</h4>
                   <ul className="text-sm text-text-secondary space-y-2">
-                    <li>• Sets x Reps (3x10, 4 sets of 8)</li>
-                    <li>• Time-based (30 sec, 1:30)</li>
-                    <li>• Distances (400m, 1 mile)</li>
-                    <li>• Rest periods (Rest 60s)</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-text-primary mb-3">Workout Types</h4>
-                  <ul className="text-sm text-text-secondary space-y-2">
-                    <li>• AMRAP, EMOM, Tabata</li>
-                    <li>• For Time, Ladders</li>
-                    <li>• Supersets, Circuits</li>
-                    <li>• Equipment detection</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-semibold text-text-primary mb-3">Import Sources</h4>
-                  <ul className="text-sm text-text-secondary space-y-2">
-                    <li>• Instagram posts & captions</li>
+                    <li>• Instagram post URLs</li>
                     <li>• Manual text entry</li>
-                    <li>• Social media URLs</li>
-                    <li>• Direct text input</li>
+                    <li>• Copy & paste captions</li>
+                    <li>• Any workout description</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-text-primary mb-3">2. Edit Manually</h4>
+                  <ul className="text-sm text-text-secondary space-y-2">
+                    <li>• Each line becomes a row</li>
+                    <li>• Edit exercise names</li>
+                    <li>• Add sets, reps, weight</li>
+                    <li>• Include rest times</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-text-primary mb-3">3. Save & Track</h4>
+                  <ul className="text-sm text-text-secondary space-y-2">
+                    <li>• Custom workout names</li>
+                    <li>• Add descriptions</li>
+                    <li>• Save to your library</li>
+                    <li>• Track your progress</li>
                   </ul>
                 </div>
               </div>

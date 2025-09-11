@@ -14,7 +14,7 @@ import { EditableWorkoutTable } from "@/lib/editable-workout-table"
 import { 
   Save, 
   ArrowLeft, 
-  Brain,
+  CheckCircle,
   AlertCircle
 } from "lucide-react"
 
@@ -47,11 +47,11 @@ export default function EditWorkoutPage() {
       setWorkoutTitle(data.title || '')
       setWorkoutDescription(data.llmData?.summary || '')
       
-      // Convert LLM exercises to editable format
+      // Convert parsed exercises to editable format
       if (data.llmData?.exercises && data.llmData.exercises.length > 0) {
         setExercises(data.llmData.exercises.map((exercise: any) => ({
           id: exercise.id || `ex-${Date.now()}-${Math.random()}`,
-          name: exercise.movement || '',
+          name: exercise.name || exercise.movement || '',
           sets: exercise.sets || 1,
           reps: exercise.reps || '',
           weight: exercise.weight || '',
@@ -168,21 +168,18 @@ export default function EditWorkoutPage() {
                   Edit Workout
                 </h1>
                 <p className="text-sm text-text-secondary">
-                  Review and customize your AI-processed workout
+                  Review and customize your imported workout
                 </p>
               </div>
             </div>
 
-            {/* AI Processing Info */}
+            {/* Import Info */}
             {workoutData.llmData && (
               <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
                 <div className="flex items-center space-x-2 mb-2">
-                  <Brain className="h-4 w-4 text-primary" />
+                  <CheckCircle className="h-4 w-4 text-primary" />
                   <span className="text-sm text-primary font-medium">
-                    AI Enhanced Workout
-                    {workoutData.llmData.usedLLM && (
-                      <span className="text-xs ml-1">({workoutData.llmData.usedLLM})</span>
-                    )}
+                    Imported Workout
                   </span>
                 </div>
                 
