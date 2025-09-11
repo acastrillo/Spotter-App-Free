@@ -1,0 +1,21 @@
+# Ignore duplicate directory
+Spotter-App-Free/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Claude settings
+.claude/settings.local.json
