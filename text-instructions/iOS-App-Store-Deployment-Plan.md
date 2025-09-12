@@ -848,3 +848,27 @@ npx cap build ios --prod
 ---
 
 *This comprehensive plan maintains the beautiful existing UI while transforming Spotter into a production-ready iOS application worthy of the App Store. Every phase is designed to preserve the user experience you love while adding the technical foundation required for success.*
+
+---
+
+## Status Update – 2025-09-11
+
+What’s Done
+- Removed mock authentication. Replaced the demo Zustand store with NextAuth Credentials; added `/auth/login` and a global session provider.
+- Test user configured via environment variables; local testing instructions provided.
+- Calendar: mark complete, schedule future workouts, markers (dot for completed, outlined ring for scheduled), count badges for multiple items, and an Upcoming panel.
+- Home: auto-refresh of stats and recent completions after marking/scheduling.
+- Streak popup: celebratory toast when a workout is completed.
+- Repo hygiene: sanitized `.env.example` and pushed changes to GitHub.
+
+Open Items (Phase 1 targets)
+- Production-ready auth: registration, email verification, and password reset; move off env-based credentials.
+- Apple Sign-In: required when adding any social providers; recommended for iOS UX.
+- Database migration: persist workouts/completions/scheduled to a managed DB instead of localStorage.
+
+Recommended Next Steps (toward App Store)
+1) Finalize auth (choose one path):
+   - NextAuth + Prisma + managed Postgres (Neon/Supabase). Keep current integration; add DB-backed users, Email (magic link) and/or Credentials, then Apple provider.
+   - Supabase Auth. Replace the wrapper with Supabase client auth + Apple provider; manage sessions via Supabase.
+2) Migrate data off localStorage: create `users`, `workouts`, `workout_completions`, `scheduled_workouts`; add API routes; one-time import from localStorage on first run.
+3) App Store readiness: add Privacy Policy and Terms pages, crash/error monitoring, analytics, and Sign in with Apple (with proper redirect/deep links). If shipping as a web-wrapped app, validate auth callbacks on device (Capacitor).
