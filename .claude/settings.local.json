@@ -61,7 +61,9 @@
       "Bash(del \"src\\app\\api\\parse-workout\\route.ts.bak\")",
       "Bash(del:*)",
       "Bash(git rm:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(git reset:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],
